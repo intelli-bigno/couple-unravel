@@ -146,7 +146,7 @@ export class StageBase extends Phaser.Scene {
     // Catenary sag
     const midX = (x1 + x2) / 2;
     const midY = (y1 + y2) / 2 + (1 - taut) * 40 + 10;
-    this.ropeGfx.quadraticCurveTo(midX, midY, x2, y2);
+    this.ropeGfx.lineTo(midX, midY); this.ropeGfx.lineTo(x2, y2);
     this.ropeGfx.strokePath();
 
     // Small knots

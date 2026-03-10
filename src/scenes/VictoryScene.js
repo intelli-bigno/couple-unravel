@@ -96,7 +96,7 @@ export class VictoryScene extends Phaser.Scene {
     rope.lineStyle(3, 0xf39c12, 0.8);
     rope.beginPath();
     rope.moveTo(width / 2 - 45, 420);
-    rope.quadraticCurveTo(width / 2, 440, width / 2 + 45, 420);
+    rope.lineTo(width / 2, 430); rope.lineTo(width / 2 + 45, 420);
     rope.strokePath();
 
     // Heart between characters

@@ -51,7 +51,7 @@ export class MenuScene extends Phaser.Scene {
     rope.lineStyle(3, 0xf39c12, 0.8);
     rope.beginPath();
     rope.moveTo(width / 2 - 25, 200);
-    rope.quadraticCurveTo(width / 2, 230, width / 2 + 25, 200);
+    rope.lineTo(width / 2, 220); rope.lineTo(width / 2 + 25, 200);
     rope.strokePath();
 
     // Buttons
