@@ -11,6 +11,12 @@
   </style>
 </head>
 <body>
+  <div id="loading" style="color:white;text-align:center;padding-top:40vh;font-family:Arial;font-size:18px;">🧶 로딩 중...</div>
   <script type="module" src="/src/main.js"></script>
+  <script>
+    window.onerror = function(msg, url, line) {
+      document.getElementById('loading').innerHTML = '⚠️ 오류 발생<br><small style="color:#aaa">' + msg + '</small>';
+    };
+  </script>
 </body>
 </html>
