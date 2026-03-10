@@ -1,6 +1,9 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, onValue, remove, push, get, update, onDisconnect } from 'firebase/database';
 import { getAuth, signInAnonymously } from 'firebase/auth';
+
+let db = null;
+let firebaseReady = false;
+let dbModule = null;
 
 const firebaseConfig = {
   apiKey: "AIzaSyAvnf6Sl_9CGBx2daS3KiIW-Ul62_3L6YA",
@@ -12,22 +15,35 @@ const firebaseConfig = {
   databaseURL: "https://couple-diary-61d56-default-rtdb.firebaseio.com"
 };
 
-let app, db, auth;
+let app, auth;
 try {
   app = initializeApp(firebaseConfig);
-  db = getDatabase(app);
   auth = getAuth(app);
-} catch (e) {
-  console.warn('Firebase init error:', e);
+} catch(e) {
+  console.warn('Firebase app init error:', e.message);
+}
+
+// Lazy init Realtime Database
+async function initDB() {
+  if (db) return true;
+  try {
+    dbModule = await import('firebase/database');
+    db = dbModule.getDatabase(app);
+    firebaseReady = true;
+    return true;
+  } catch(e) {
+    console.warn('Realtime DB not available:', e.message);
+    return false;
+  }
 }
 
 export async function signIn() {
+  if (!auth) return 'solo-' + Math.random().toString(36).substring(2, 8);
   try {
-    if (!auth) return 'solo-' + Math.random().toString(36).substring(2, 8);
     const cred = await signInAnonymously(auth);
     return cred.user.uid;
   } catch (e) {
-    console.warn('Auth error, using solo mode:', e);
+    console.warn('Auth error:', e.message);
     return 'solo-' + Math.random().toString(36).substring(2, 8);
   }
 }
@@ -37,84 +53,84 @@ export function generateRoomCode() {
 }
 
 export async function createRoom(code, uid) {
-  const roomRef = ref(db, `rooms/${code}`);
-  await set(roomRef, {
-    host: uid,
-    player1: uid,
-    player2: null,
-    state: 'waiting',
-    stage: 1,
-    puzzle: {},
-    createdAt: Date.now()
-  });
-  onDisconnect(ref(db, `rooms/${code}/players/${uid}`)).remove();
+  if (!(await initDB())) return code;
+  try {
+    const roomRef = dbModule.ref(db, `rooms/${code}`);
+    await dbModule.set(roomRef, {
+      host: uid, player1: uid, player2: null,
+      state: 'waiting', stage: 1, puzzle: {}, createdAt: Date.now()
+    });
+  } catch(e) { console.warn('createRoom error:', e.message); }
   return code;
 }
 
 export async function joinRoom(code, uid) {
-  const roomRef = ref(db, `rooms/${code}`);
-  const snap = await get(roomRef);
-  if (!snap.exists()) return null;
-  const data = snap.val();
-  if (data.player2 && data.player2 !== uid) return null;
-  await update(roomRef, { player2: uid, state: 'ready' });
-  onDisconnect(ref(db, `rooms/${code}/players/${uid}`)).remove();
-  return data;
+  if (!(await initDB())) return null;
+  try {
+    const roomRef = dbModule.ref(db, `rooms/${code}`);
+    const snap = await dbModule.get(roomRef);
+    if (!snap.exists()) return null;
+    const data = snap.val();
+    if (data.player2 && data.player2 !== uid) return null;
+    await dbModule.update(roomRef, { player2: uid, state: 'ready' });
+    return data;
+  } catch(e) { console.warn('joinRoom error:', e.message); return null; }
 }
 
 export function syncPlayerPosition(code, playerNum, x, y, velX, velY) {
-  const pRef = ref(db, `rooms/${code}/positions/p${playerNum}`);
-  set(pRef, { x, y, velX, velY, t: Date.now() });
+  if (!firebaseReady || !dbModule) return;
+  try { dbModule.set(dbModule.ref(db, `rooms/${code}/positions/p${playerNum}`), { x, y, velX, velY, t: Date.now() }); } catch(e) {}
 }
 
 export function onPlayerPosition(code, playerNum, callback) {
-  const pRef = ref(db, `rooms/${code}/positions/p${playerNum}`);
-  return onValue(pRef, (snap) => {
-    if (snap.exists()) callback(snap.val());
-  });
+  if (!firebaseReady || !dbModule) return () => {};
+  try {
+    return dbModule.onValue(dbModule.ref(db, `rooms/${code}/positions/p${playerNum}`), (snap) => {
+      if (snap.exists()) callback(snap.val());
+    });
+  } catch(e) { return () => {}; }
 }
 
 export function syncPuzzleState(code, puzzleId, state) {
-  const pRef = ref(db, `rooms/${code}/puzzle/${puzzleId}`);
-  set(pRef, state);
+  if (!firebaseReady || !dbModule) return;
+  try { dbModule.set(dbModule.ref(db, `rooms/${code}/puzzle/${puzzleId}`), state); } catch(e) {}
 }
 
 export function onPuzzleState(code, callback) {
-  const pRef = ref(db, `rooms/${code}/puzzle`);
-  return onValue(pRef, (snap) => {
-    if (snap.exists()) callback(snap.val());
-  });
+  if (!firebaseReady || !dbModule) return () => {};
+  try {
+    return dbModule.onValue(dbModule.ref(db, `rooms/${code}/puzzle`), (snap) => {
+      if (snap.exists()) callback(snap.val());
+    });
+  } catch(e) { return () => {}; }
 }
 
 export function syncStage(code, stage) {
-  set(ref(db, `rooms/${code}/stage`), stage);
+  if (!firebaseReady || !dbModule) return;
+  try { dbModule.set(dbModule.ref(db, `rooms/${code}/stage`), stage); } catch(e) {}
 }
 
 export function onStageChange(code, callback) {
-  onValue(ref(db, `rooms/${code}/stage`), (snap) => {
-    if (snap.exists()) callback(snap.val());
-  });
+  if (!firebaseReady || !dbModule) return () => {};
+  try {
+    return dbModule.onValue(dbModule.ref(db, `rooms/${code}/stage`), (snap) => {
+      if (snap.exists()) callback(snap.val());
+    });
+  } catch(e) { return () => {}; }
 }
 
 export function syncGameEvent(code, event) {
-  set(ref(db, `rooms/${code}/event`), { ...event, t: Date.now() });
+  if (!firebaseReady || !dbModule) return;
+  try { dbModule.set(dbModule.ref(db, `rooms/${code}/event`), { ...event, t: Date.now() }); } catch(e) {}
 }
 
 export function onGameEvent(code, callback) {
-  onValue(ref(db, `rooms/${code}/event`), (snap) => {
-    if (snap.exists()) callback(snap.val());
-  });
+  if (!firebaseReady || !dbModule) return () => {};
+  try {
+    return dbModule.onValue(dbModule.ref(db, `rooms/${code}/event`), (snap) => {
+      if (snap.exists()) callback(snap.val());
+    });
+  } catch(e) { return () => {}; }
 }
 
-export { db, auth, ref, set, onValue, remove, get, update };
-
-// Safe wrappers for when Realtime DB isn't available
-export function safeSyncPlayerPosition(code, playerNum, x, y, velX, velY) {
-  if (!db) return;
-  try { syncPlayerPosition(code, playerNum, x, y, velX, velY); } catch(e) {}
-}
-
-export function safeOnPlayerPosition(code, playerNum, callback) {
-  if (!db) return () => {};
-  try { return onPlayerPosition(code, playerNum, callback); } catch(e) { return () => {}; }
-}
+export { db, auth, firebaseReady };
