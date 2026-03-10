@@ -189,10 +189,15 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  doSolo() {
+  async doSolo() {
     window.gameState.mode = 'solo';
     window.gameState.controllingPlayer = 1;
     window.gameState.startTime = Date.now();
+    try {
+      window.gameState.uid = await signIn();
+    } catch(e) {
+      window.gameState.uid = 'solo-user';
+    }
     this.scene.start('MapScene');
   }
 }

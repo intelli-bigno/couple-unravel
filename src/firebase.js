@@ -12,13 +12,24 @@ const firebaseConfig = {
   databaseURL: "https://couple-diary-61d56-default-rtdb.firebaseio.com"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+let app, db, auth;
+try {
+  app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  auth = getAuth(app);
+} catch (e) {
+  console.warn('Firebase init error:', e);
+}
 
 export async function signIn() {
-  const cred = await signInAnonymously(auth);
-  return cred.user.uid;
+  try {
+    if (!auth) return 'solo-' + Math.random().toString(36).substring(2, 8);
+    const cred = await signInAnonymously(auth);
+    return cred.user.uid;
+  } catch (e) {
+    console.warn('Auth error, using solo mode:', e);
+    return 'solo-' + Math.random().toString(36).substring(2, 8);
+  }
 }
 
 export function generateRoomCode() {
@@ -96,3 +107,14 @@ export function onGameEvent(code, callback) {
 }
 
 export { db, auth, ref, set, onValue, remove, get, update };
+
+// Safe wrappers for when Realtime DB isn't available
+export function safeSyncPlayerPosition(code, playerNum, x, y, velX, velY) {
+  if (!db) return;
+  try { syncPlayerPosition(code, playerNum, x, y, velX, velY); } catch(e) {}
+}
+
+export function safeOnPlayerPosition(code, playerNum, callback) {
+  if (!db) return () => {};
+  try { return onPlayerPosition(code, playerNum, callback); } catch(e) { return () => {}; }
+}
