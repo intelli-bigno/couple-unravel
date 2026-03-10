@@ -56,13 +56,22 @@ export class StageBase extends Phaser.Scene {
 
   createPlayers() {
     // Player bodies (using rectangles for physics, graphics overlay for visuals)
-    this.player1 = this.physics.add.sprite(100, 400, '__DEFAULT').setVisible(false);
+    // Create a tiny texture for physics sprites
+    if (!this.textures.exists('pixel')) {
+      const canvas = this.textures.createCanvas('pixel', 2, 2);
+      const ctx = canvas.getContext();
+      ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.fillRect(0, 0, 2, 2);
+      canvas.refresh();
+    }
+
+    this.player1 = this.physics.add.sprite(100, 400, 'pixel').setVisible(false);
     this.player1.setSize(24, 32).setOffset(4, 4);
     this.player1.setBounce(0.1);
     this.player1.setCollideWorldBounds(true);
     this.player1.body.setMaxVelocityX(200);
 
-    this.player2 = this.physics.add.sprite(140, 400, '__DEFAULT').setVisible(false);
+    this.player2 = this.physics.add.sprite(140, 400, 'pixel').setVisible(false);
     this.player2.setSize(24, 32).setOffset(4, 4);
     this.player2.setBounce(0.1);
     this.player2.setCollideWorldBounds(true);
